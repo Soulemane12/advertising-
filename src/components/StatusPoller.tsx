@@ -22,7 +22,7 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
   useEffect(() => {
     const pollStatus = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/videos/${videoId}/status`);
+        const response = await fetch(`https://advertising-475w.onrender.com/api/videos/${videoId}/status`);
         if (!response.ok) {
           throw new Error('Failed to fetch status');
         }

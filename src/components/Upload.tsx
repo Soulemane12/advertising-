@@ -92,7 +92,7 @@ export default function Upload() {
         body.append('url', url);
       }
 
-      const res = await fetch('http://localhost:8000/api/videos', {
+      const res = await fetch('https://advertising-475w.onrender.com/api/videos', {
         method: 'POST',
         body,
       });
