@@ -67,7 +67,25 @@ export default function SimpleUpload() {
         <input
           type="file"
           accept="video/*"
-          onChange={e => setFile(e.target.files?.[0] || null)}
+          onChange={e => {
+            const selectedFile = e.target.files?.[0] || null;
+            if (selectedFile) {
+              // Check file size
+              const fileSizeMB = selectedFile.size / 1024 / 1024;
+              if (fileSizeMB > 100) {
+                setError('File too large. Please use a video smaller than 100MB or try a video URL instead.');
+                return;
+              }
+              if (fileSizeMB > 50) {
+                setError(`Large file detected (${fileSizeMB.toFixed(1)}MB). Upload may take longer. Consider using a video URL for faster processing.`);
+              } else {
+                setError(null);
+              }
+            } else {
+              setError(null);
+            }
+            setFile(selectedFile);
+          }}
           style={{ display: 'block', marginTop: '8px' }}
         />
       </div>

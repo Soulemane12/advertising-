@@ -42,12 +42,27 @@ export default function Upload() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      if (selectedFile.type.startsWith('video/')) {
-        setFile(selectedFile);
-        setUrl('');
-        setError(null);
-      } else {
+
+      // Check file type
+      if (!selectedFile.type.startsWith('video/')) {
         setError('Please select a video file');
+        return;
+      }
+
+      // Check file size (warn if > 50MB)
+      const fileSizeMB = selectedFile.size / 1024 / 1024;
+      if (fileSizeMB > 100) {
+        setError('File too large. Please use a video smaller than 100MB or try a video URL instead.');
+        return;
+      }
+
+      setFile(selectedFile);
+      setUrl('');
+      setError(null);
+
+      // Show warning for large files
+      if (fileSizeMB > 50) {
+        setError(`Large file detected (${fileSizeMB.toFixed(1)}MB). Upload may take longer. Consider using a video URL for faster processing.`);
       }
     }
   };
