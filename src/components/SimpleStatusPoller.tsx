@@ -12,7 +12,7 @@ interface VideoStatus {
   progress?: number;
   message?: string;
   error?: string;
-  analysis?: any;
+  analysis?: Record<string, unknown>;
 }
 
 export default function StatusPoller({ videoId }: StatusPollerProps) {
