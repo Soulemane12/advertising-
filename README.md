@@ -1,36 +1,114 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Video Analysis Advertising System
 
-## Getting Started
+A modern video analysis platform that uses TwelveLabs AI to analyze video content for advertising insights.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Video Upload**: Drag-and-drop interface for video files or URL input
+- **Real-time Analysis**: Live progress tracking of video processing
+- **TwelveLabs Integration**: AI-powered video content analysis
+- **Responsive Design**: Works on desktop and mobile devices
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: FastAPI, Python 3.11+
+- **AI**: TwelveLabs Video Understanding API
+- **Deployment**: Vercel (Frontend), Railway/Render (Backend recommended)
+
+## Setup
+
+### Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```env
+TL_API_KEY=your_twelvelabs_api_key
+TL_INDEX_ID=your_twelvelabs_index_id
+ELEVEN_API_KEY=your_elevenlabs_api_key_optional
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Local Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Install Dependencies**
+   ```bash
+   npm install
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Set up Python Backend**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r backend/requirements.txt
+   ```
 
-## Learn More
+3. **Create TwelveLabs Index**
+   ```bash
+   cd backend
+   python create_index.py
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. **Run Development Servers**
+   ```bash
+   # Run both frontend and backend concurrently
+   npm run dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   # Or run separately:
+   npm run dev:frontend  # Frontend only
+   npm run dev:backend   # Backend only
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+### Frontend (Vercel)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Connect your GitHub repository to Vercel
+2. Set environment variables in Vercel dashboard
+3. Deploy automatically on push to main
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Backend (Railway/Render)
+
+1. Deploy the `backend/` directory
+2. Install Python dependencies from `requirements.txt`
+3. Set environment variables
+4. Run command: `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+### Update Frontend for Production
+
+Update the API URLs in the frontend components to point to your deployed backend.
+
+## Project Structure
+
+```
+├── src/
+│   ├── components/          # React components
+│   │   ├── Upload.tsx       # Video upload interface
+│   │   └── StatusPoller.tsx # Real-time status polling
+│   ├── app/
+│   │   ├── page.tsx         # Main page
+│   │   └── api/             # Next.js API routes (unused in production)
+├── backend/
+│   ├── main.py              # FastAPI application
+│   ├── create_index.py      # TwelveLabs index setup
+│   └── requirements.txt     # Python dependencies
+├── start-backend.sh         # Backend startup script
+└── package.json             # Node.js configuration
+```
+
+## API Endpoints
+
+- `POST /api/videos` - Upload video file or URL
+- `GET /api/videos/{id}/status` - Get video processing status
+- `GET /health` - Health check endpoint
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+MIT License - see LICENSE file for details
