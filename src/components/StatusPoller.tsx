@@ -20,23 +20,38 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔄 StatusPoller started for videoId:', videoId);
+
     const pollStatus = async () => {
       try {
-        const response = await fetch(`https://advertising-475w.onrender.com/api/videos/${videoId}/status`);
+        const statusUrl = `https://advertising-475w.onrender.com/api/videos/${videoId}/status`;
+        console.log('📡 Polling status from:', statusUrl);
+
+        const response = await fetch(statusUrl);
+        console.log('📊 Status response:', response.status, response.statusText);
+
         if (!response.ok) {
-          throw new Error('Failed to fetch status');
+          console.log('❌ Status response not ok:', response.status, response.statusText);
+          throw new Error(`Status check failed: ${response.statusText}`);
         }
 
         const data: VideoStatus = await response.json();
+        console.log('✅ Status data received:', data);
         setStatus(data);
         setLoading(false);
 
         // Stop polling if video processing is complete or errored
         if (data.status === 'completed' || data.status === 'error') {
+          console.log('🏁 Polling stopped - final status:', data.status);
           clearInterval(interval);
         }
       } catch (error) {
-        console.error('Error polling status:', error);
+        console.error('❌ Error polling status:', error);
+
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          console.log('🌐 Network error detected during status polling');
+        }
+
         setStatus({
           id: videoId,
           status: 'error',

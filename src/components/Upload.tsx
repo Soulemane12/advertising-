@@ -70,12 +70,18 @@ export default function Upload() {
   };
 
   const submit = async () => {
+    console.log('🚀 Upload submit started');
+    console.log('📁 File:', file?.name || 'none');
+    console.log('🔗 URL:', url || 'none');
+
     if (!file && !url) {
+      console.log('❌ No file or URL provided');
       setError('Please select a file or enter a URL');
       return;
     }
 
     if (url && !validateUrl(url)) {
+      console.log('❌ Invalid URL format');
       setError('Please enter a valid URL');
       return;
     }
@@ -86,27 +92,50 @@ export default function Upload() {
     try {
       const body = new FormData();
       if (file) {
+        console.log('📁 Adding file to FormData:', file.name, file.size, 'bytes');
         body.append('file', file);
       }
       if (url) {
+        console.log('🔗 Adding URL to FormData:', url);
         body.append('url', url);
       }
 
-      const res = await fetch('https://advertising-475w.onrender.com/api/videos', {
+      const apiUrl = 'https://advertising-475w.onrender.com/api/videos';
+      console.log('📡 Making request to:', apiUrl);
+      console.log('📦 Request method: POST');
+      console.log('📋 FormData entries:');
+      for (const [key, value] of body.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+
+      const res = await fetch(apiUrl, {
         method: 'POST',
         body,
       });
 
+      console.log('📊 Response status:', res.status);
+      console.log('📝 Response statusText:', res.statusText);
+      console.log('🔗 Response URL:', res.url);
+
       if (!res.ok) {
-        throw new Error(`Upload failed: ${res.statusText}`);
+        const errorText = await res.text();
+        console.log('❌ Response error text:', errorText);
+        throw new Error(`Upload failed: ${res.statusText} - ${errorText}`);
       }
 
       const json = await res.json();
+      console.log('✅ Upload successful:', json);
       setVideoId(json.videoId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      console.error('❌ Upload error:', err);
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Network connection failed. Please check your internet connection and try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Upload failed');
+      }
     } finally {
       setLoading(false);
+      console.log('🏁 Upload process finished');
     }
   };
 

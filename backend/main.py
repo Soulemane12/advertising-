@@ -22,11 +22,22 @@ if not TL_KEY:
 
 app = FastAPI(title="Video Analysis API", version="1.0.0")
 
-# CORS middleware for development
-# Allows any localhost port (3000, 3001, 3002, etc.) for flexible development
+# CORS middleware for development and production
+# Allows localhost and Vercel deployment domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origins=[
+        # Local development
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+        # Vercel deployment
+        "https://advertising-psi.vercel.app",
+        "https://advertising-aneh2n3mm-soulemane-sows-projects.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,23 +68,36 @@ async def create_video(
     Upload a video file or URL to TwelveLabs for analysis
     Returns a videoId for tracking the analysis progress
     """
+    print("=" * 50)
+    print("🚀 VIDEO UPLOAD REQUEST RECEIVED")
+    print("=" * 50)
+    print(f"📁 File: {file.filename if file else 'None'}")
+    print(f"🔗 URL: {url if url else 'None'}")
+
     try:
         # Validate inputs
         if not file and not url:
+            print("❌ VALIDATION ERROR: No file or URL provided")
             raise HTTPException(status_code=400, detail="Provide either file or url")
 
         # Ensure index exists
         if not INDEX_ID:
+            print(f"❌ CONFIG ERROR: INDEX_ID not set (current value: '{INDEX_ID}')")
             raise HTTPException(
                 status_code=500,
                 detail="Create your TwelveLabs index once and set TL_INDEX_ID in .env"
             )
+
+        print(f"✅ CONFIG OK: INDEX_ID = {INDEX_ID}")
+        print(f"✅ CONFIG OK: TL_KEY = {TL_KEY[:10]}...{TL_KEY[-10:] if len(TL_KEY) > 20 else TL_KEY}")
 
         headers = {"x-api-key": TL_KEY}
         task_id = None
 
         if url:
             # Handle URL upload - TwelveLabs requires multipart/form-data for all requests
+            print(f"🔗 PROCESSING URL: {url}")
+
             response = requests.post(
                 f"{TL_API}/tasks",
                 headers=headers,
@@ -83,14 +107,24 @@ async def create_video(
                 },
                 timeout=30
             )
+            print(f"📊 TwelveLabs Response Status: {response.status_code}")
+            print(f"📄 TwelveLabs Response: {response.text}")
+
             response.raise_for_status()
             response_data = response.json()
             # TwelveLabs returns _id instead of task_id
             task_id = response_data.get("_id") or response_data.get("task_id")
+            print(f"✅ TwelveLabs Task Created: {task_id}")
 
         elif file:
             # Handle file upload
+            print(f"📁 PROCESSING FILE: {file.filename}")
+            print(f"📏 File Size: {file.size} bytes")
+            print(f"📝 Content Type: {file.content_type}")
+
             file_content = await file.read()
+            print(f"📦 File Content Read: {len(file_content)} bytes")
+
             files = {
                 "file": (file.filename, file_content, file.content_type)
             }
@@ -98,6 +132,7 @@ async def create_video(
                 "index_id": INDEX_ID
             }
 
+            print(f"📡 Sending to TwelveLabs API: {TL_API}/tasks")
             response = requests.post(
                 f"{TL_API}/tasks",
                 headers=headers,
@@ -105,16 +140,21 @@ async def create_video(
                 data=data,
                 timeout=30
             )
+            print(f"📊 TwelveLabs Response Status: {response.status_code}")
+            print(f"📄 TwelveLabs Response: {response.text}")
+
             response.raise_for_status()
             response_data = response.json()
             # TwelveLabs returns _id instead of task_id
             task_id = response_data.get("_id") or response_data.get("task_id")
+            print(f"✅ TwelveLabs Task Created: {task_id}")
 
         # Generate our internal video ID
         video_id = f"vid_{uuid.uuid4().hex[:8]}"
+        print(f"🆔 Generated Video ID: {video_id}")
 
         # Store in our database
-        DB[video_id] = {
+        video_data = {
             "status": "processing",
             "progress": 10,
             "message": "Video submitted to TwelveLabs for analysis",
@@ -122,15 +162,26 @@ async def create_video(
             "analysis": None,
             "created_at": time.time()
         }
+        DB[video_id] = video_data
+        print(f"💾 Stored in DB: {video_data}")
 
-        return {"videoId": video_id}
+        response_data = {"videoId": video_id}
+        print(f"✅ UPLOAD SUCCESS - Returning: {response_data}")
+        print("=" * 50)
+        return response_data
 
     except requests.exceptions.RequestException as e:
+        print(f"❌ TWELVELABS API ERROR: {str(e)}")
+        print("=" * 50)
         raise HTTPException(
             status_code=500,
             detail=f"TwelveLabs API error: {str(e)}"
         )
     except Exception as e:
+        print(f"❌ INTERNAL SERVER ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 50)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
@@ -141,20 +192,27 @@ async def get_video_status(video_id: str):
     """
     Get the current status of a video analysis task
     """
+    print(f"🔍 STATUS CHECK for video_id: {video_id}")
+
     if video_id not in DB:
+        print(f"❌ Video not found in DB: {video_id}")
+        print(f"📋 Available videos: {list(DB.keys())}")
         raise HTTPException(status_code=404, detail="Video not found")
 
     video_data = DB[video_id]
     task_id = video_data["task_id"]
+    print(f"✅ Found video in DB, task_id: {task_id}")
 
     try:
         # Check status with TwelveLabs
         headers = {"x-api-key": TL_KEY}
-        response = requests.get(
-            f"{TL_API}/tasks/{task_id}",
-            headers=headers,
-            timeout=10
-        )
+        status_url = f"{TL_API}/tasks/{task_id}"
+        print(f"📡 Checking TwelveLabs status: {status_url}")
+
+        response = requests.get(status_url, headers=headers, timeout=10)
+        print(f"📊 TwelveLabs status response: {response.status_code}")
+        print(f"📄 TwelveLabs status data: {response.text}")
+
         response.raise_for_status()
 
         task_data = response.json()
