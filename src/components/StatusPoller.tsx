@@ -12,7 +12,7 @@ interface VideoStatus {
   progress?: number;
   message?: string;
   error?: string;
-  timeline?: any;
+  timeline?: Record<string, unknown>;
 }
 
 export default function StatusPoller({ videoId }: StatusPollerProps) {
@@ -20,8 +20,6 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-
     const pollStatus = async () => {
       try {
         const response = await fetch(`http://localhost:8000/api/videos/${videoId}/status`);
@@ -53,7 +51,7 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
     pollStatus();
 
     // Set up polling interval (every 2 seconds)
-    interval = setInterval(pollStatus, 2000);
+    const interval = setInterval(pollStatus, 2000);
 
     // Cleanup on unmount
     return () => {
@@ -193,17 +191,17 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
           <h4 className="font-semibold text-blue-800 mb-2">Processing Steps:</h4>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li className={status.status === 'uploading' ? 'font-bold' : 'line-through'}>
+            <li className="line-through">
               ✓ Upload video
             </li>
-            <li className={status.status === 'processing' ? 'font-bold' : status.status === 'indexing' || status.status === 'completed' ? 'line-through' : ''}>
+            <li className={status.status === 'processing' ? 'font-bold' : 'line-through'}>
               {status.status === 'processing' ? '🔄' : '✓'} Analyze content (scenes, objects, speech)
             </li>
-            <li className={status.status === 'indexing' ? 'font-bold' : status.status === 'completed' ? 'line-through' : ''}>
-              {status.status === 'indexing' ? '🔄' : status.status === 'completed' ? '✓' : '⏳'} Create searchable index
+            <li className={status.status === 'indexing' ? 'font-bold' : ''}>
+              {status.status === 'indexing' ? '🔄' : '⏳'} Create searchable index
             </li>
-            <li className={status.status === 'completed' ? 'font-bold' : ''}>
-              {status.status === 'completed' ? '✓' : '⏳'} Ready for template selection
+            <li>
+              ⏳ Ready for template selection
             </li>
           </ul>
         </div>
