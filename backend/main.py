@@ -309,6 +309,31 @@ async def get_video_details(video_id: str):
         "task_id": video_data["task_id"]
     }
 
+@app.get("/api/videos/{video_id}/analysis")
+async def get_video_analysis(video_id: str):
+    """
+    Get detailed analysis results for a completed video
+    """
+    if video_id not in DB:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_data = DB[video_id]
+
+    if video_data["status"] != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Video analysis not yet complete"
+        )
+
+    analysis = video_data.get("analysis")
+    if not analysis:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis data not available"
+        )
+
+    return analysis
+
 @app.get("/health")
 async def health_check():
     """

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Timeline from './Timeline';
 
 interface StatusPollerProps {
   videoId: string;
@@ -51,6 +52,20 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
     return <div>Loading status...</div>;
   }
 
+  // Show Timeline when analysis is complete
+  if (status.status === 'completed') {
+    return (
+      <div>
+        <div style={{ border: '1px solid #ccc', padding: '16px', marginTop: '16px', marginBottom: '16px' }}>
+          <h3>✅ Video Analysis Complete!</h3>
+          <p><strong>ID:</strong> {status.id}</p>
+          <p style={{ color: 'green' }}><strong>Status:</strong> Ready for clip selection</p>
+        </div>
+        <Timeline videoId={status.id} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ border: '1px solid #ccc', padding: '16px', marginTop: '16px' }}>
       <h3>Video Processing Status</h3>
@@ -59,15 +74,6 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
       {status.progress && <p><strong>Progress:</strong> {status.progress}%</p>}
       {status.message && <p><strong>Message:</strong> {status.message}</p>}
       {status.error && <p style={{ color: 'red' }}><strong>Error:</strong> {status.error}</p>}
-
-      {status.status === 'completed' && status.analysis && (
-        <details>
-          <summary>Analysis Results</summary>
-          <pre style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto' }}>
-            {JSON.stringify(status.analysis, null, 2)}
-          </pre>
-        </details>
-      )}
     </div>
   );
 }
