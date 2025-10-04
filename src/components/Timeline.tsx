@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { loadAnalysis } from '@/lib/api';
+import TemplateSelector from './TemplateSelector';
+import { Template, EditRequest, AspectRatio, CaptionStyle } from '@/types/template';
 
 interface Scene {
   id: string;
@@ -23,6 +25,8 @@ export default function Timeline({ videoId }: TimelineProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     loadVideoAnalysis();
@@ -132,11 +136,62 @@ export default function Timeline({ videoId }: TimelineProps) {
   };
 
   const generateClips = () => {
-    const selectedScenes = scenes.filter(s => selectedIds.includes(s.id));
-    console.log('Generating clips from selected scenes:', selectedScenes);
+    if (selectedIds.length === 0) {
+      alert('Please select at least one scene');
+      return;
+    }
+    setShowTemplates(true);
+  };
 
-    // Here you would typically send this to your video generation service
-    alert(`Generating ${selectedScenes.length} clips with total duration: ${formatTime(getTotalDuration())}`);
+  const handleTemplateGenerate = async (
+    template: Template,
+    customizations: {
+      aspectRatios: AspectRatio[];
+      durationsSec: number[];
+      captions: CaptionStyle;
+    }
+  ) => {
+    setGenerating(true);
+
+    try {
+      const selectedScenes = scenes.filter(s => selectedIds.includes(s.id));
+      const selections = selectedScenes.map(scene => ({
+        startMs: scene.start * 1000,
+        endMs: scene.end * 1000
+      }));
+
+      const editRequest: EditRequest = {
+        videoId,
+        selections,
+        templateId: template.id,
+        aspectRatios: customizations.aspectRatios,
+        durationsSec: customizations.durationsSec,
+        captions: customizations.captions
+      };
+
+      console.log('🎬 Sending edit request:', editRequest);
+
+      const response = await fetch('/api/edits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editRequest)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Edit request failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Edit job created:', result);
+
+      alert(`🎉 Successfully generated ${result.files?.length || 0} video files!\nJob ID: ${result.jobId}`);
+
+    } catch (error) {
+      console.error('❌ Edit generation error:', error);
+      alert(`Failed to generate videos: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   if (loading) {
@@ -152,6 +207,35 @@ export default function Timeline({ videoId }: TimelineProps) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-md p-4">
         <p className="text-red-700">Error: {error}</p>
+      </div>
+    );
+  }
+
+  // Show template selector after scene selection
+  if (showTemplates) {
+    return (
+      <div>
+        <div className="mb-6">
+          <button
+            onClick={() => setShowTemplates(false)}
+            className="mb-4 text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            ← Back to Scene Selection
+          </button>
+        </div>
+        <TemplateSelector
+          onGenerate={handleTemplateGenerate}
+          selectedSceneCount={selectedIds.length}
+          totalDuration={getTotalDuration()}
+        />
+        {generating && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-center">Generating videos...</p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

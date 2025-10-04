@@ -3,8 +3,9 @@ import time
 import uuid
 import requests
 import re
-from typing import Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+import subprocess
+from typing import Optional, List, Dict
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -54,6 +55,14 @@ class VideoStatus(BaseModel):
     error: Optional[str] = None
     task_id: Optional[str] = None
     analysis: Optional[dict] = None
+
+class EditRequest(BaseModel):
+    videoId: str
+    selections: List[Dict[str, float]]  # [{"startMs": 0, "endMs": 3500}, ...]
+    templateId: str
+    aspectRatios: List[str]
+    durationsSec: List[int]
+    captions: str
 
 @app.get("/")
 async def root():
@@ -333,6 +342,162 @@ async def get_video_analysis(video_id: str):
         )
 
     return analysis
+
+def transcript_to_srt(transcript, srt_path):
+    """Convert transcript JSON to SRT subtitle format"""
+    def ms2srt(ms):
+        s = int(ms // 1000)
+        ms = int(ms % 1000)
+        h = s // 3600
+        m = (s % 3600) // 60
+        s = s % 60
+        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+    with open(srt_path, "w") as f:
+        for i, t in enumerate(transcript, start=1):
+            start_ms = t.get('startMs', 0)
+            end_ms = t.get('endMs', start_ms + 1000)
+            text = t.get('text', '')
+            f.write(f"{i}\n{ms2srt(start_ms)} --> {ms2srt(end_ms)}\n{text}\n\n")
+
+def run_ffmpeg_command(cmd):
+    """Run ffmpeg command safely with error handling"""
+    try:
+        print(f"🎬 Running ffmpeg: {cmd}")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            print(f"❌ FFmpeg error: {result.stderr}")
+            return False
+        print(f"✅ FFmpeg success: {result.stdout}")
+        return True
+    except subprocess.TimeoutExpired:
+        print("❌ FFmpeg timeout after 5 minutes")
+        return False
+    except Exception as e:
+        print(f"❌ FFmpeg exception: {str(e)}")
+        return False
+
+@app.post("/api/edits")
+async def create_edit_job(req: EditRequest):
+    """
+    Create video edit job from selected scenes and template settings
+    """
+    print("=" * 50)
+    print("🎬 VIDEO EDIT REQUEST RECEIVED")
+    print("=" * 50)
+    print(f"📹 Video ID: {req.videoId}")
+    print(f"📊 Selections: {len(req.selections)} scenes")
+    print(f"🎨 Template: {req.templateId}")
+    print(f"📐 Aspect Ratios: {req.aspectRatios}")
+    print(f"⏱️ Durations: {req.durationsSec}")
+    print(f"📝 Captions: {req.captions}")
+
+    try:
+        # Generate job ID
+        job_id = f"job_{uuid.uuid4().hex[:8]}"
+        output_dir = f"/tmp/{job_id}"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # In real app, you'd download from TwelveLabs or cloud storage
+        # For demo, assume we have access to original video
+        src_video = f"/tmp/{req.videoId}.mp4"
+
+        print(f"📁 Output directory: {output_dir}")
+        print(f"🎥 Source video: {src_video}")
+
+        # Step 1: Extract selected segments
+        parts = []
+        for i, seg in enumerate(req.selections):
+            start_sec = seg["startMs"] / 1000.0
+            end_sec = seg["endMs"] / 1000.0
+            part_file = f"{output_dir}/part{i}.mp4"
+
+            cmd = f'ffmpeg -y -ss {start_sec} -to {end_sec} -i "{src_video}" -c copy "{part_file}"'
+            if run_ffmpeg_command(cmd):
+                parts.append(part_file)
+                print(f"✅ Created part {i}: {start_sec}s - {end_sec}s")
+            else:
+                print(f"❌ Failed to create part {i}")
+
+        if not parts:
+            raise HTTPException(status_code=500, detail="Failed to extract any video segments")
+
+        # Step 2: Concatenate parts
+        concat_list = f"{output_dir}/list.txt"
+        with open(concat_list, "w") as f:
+            for p in parts:
+                f.write(f"file '{p}'\n")
+
+        concat_video = f"{output_dir}/concat.mp4"
+        cmd = f'ffmpeg -y -f concat -safe 0 -i "{concat_list}" -c copy "{concat_video}"'
+        if not run_ffmpeg_command(cmd):
+            raise HTTPException(status_code=500, detail="Failed to concatenate video segments")
+
+        print(f"✅ Concatenated video: {concat_video}")
+
+        # Step 3: Generate outputs for each duration and aspect ratio
+        outputs = []
+        aspect_dims = {
+            "9:16": (1080, 1920),
+            "1:1": (1080, 1080),
+            "16:9": (1920, 1080)
+        }
+
+        for duration in req.durationsSec:
+            # First trim to target duration
+            trimmed_video = f"{output_dir}/concat_{duration}s.mp4"
+            cmd = f'ffmpeg -y -t {duration} -i "{concat_video}" -c copy "{trimmed_video}"'
+            if not run_ffmpeg_command(cmd):
+                print(f"❌ Failed to trim to {duration}s")
+                continue
+
+            for aspect_ratio in req.aspectRatios:
+                if aspect_ratio not in aspect_dims:
+                    print(f"❌ Unknown aspect ratio: {aspect_ratio}")
+                    continue
+
+                w, h = aspect_dims[aspect_ratio]
+                output_file = f"{output_dir}/{duration}s_{aspect_ratio.replace(':', 'x')}.mp4"
+
+                # Scale and pad to target dimensions
+                vf = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
+
+                # Add captions if requested
+                if req.captions == "burned":
+                    # Try to get transcript from analysis
+                    video_data = DB.get(req.videoId, {})
+                    analysis = video_data.get("analysis", {})
+                    transcript = analysis.get("transcript", [])
+
+                    if transcript:
+                        srt_file = f"{output_dir}/captions.srt"
+                        transcript_to_srt(transcript, srt_file)
+                        vf += f",subtitles={srt_file}"
+                        print(f"📝 Added burned captions from transcript")
+
+                cmd = f'ffmpeg -y -i "{trimmed_video}" -vf "{vf}" -c:a copy "{output_file}"'
+                if run_ffmpeg_command(cmd):
+                    outputs.append(output_file)
+                    print(f"✅ Generated: {duration}s {aspect_ratio} → {output_file}")
+                else:
+                    print(f"❌ Failed to generate: {duration}s {aspect_ratio}")
+
+        print(f"🎉 Edit job completed: {len(outputs)} files generated")
+        print("=" * 50)
+
+        return {
+            "jobId": job_id,
+            "files": outputs,
+            "outputDir": output_dir,
+            "message": f"Successfully generated {len(outputs)} video files"
+        }
+
+    except Exception as e:
+        print(f"❌ Edit job failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 50)
+        raise HTTPException(status_code=500, detail=f"Edit job failed: {str(e)}")
 
 @app.get("/health")
 async def health_check():
