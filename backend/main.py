@@ -98,13 +98,15 @@ async def create_video(
             # Handle URL upload - TwelveLabs requires multipart/form-data for all requests
             print(f"🔗 PROCESSING URL: {url}")
 
+            files = {
+                "index_id": (None, INDEX_ID),
+                "video_url": (None, url)
+            }
+
             response = requests.post(
                 f"{TL_API}/tasks",
                 headers=headers,
-                files={
-                    "index_id": (None, INDEX_ID),
-                    "video_url": (None, url)
-                },
+                files=files,
                 timeout=30
             )
             print(f"📊 TwelveLabs Response Status: {response.status_code}")
@@ -126,7 +128,7 @@ async def create_video(
             print(f"📦 File Content Read: {len(file_content)} bytes")
 
             files = {
-                "file": (file.filename, file_content, file.content_type)
+                "video_file": (file.filename, file_content, file.content_type)
             }
             data = {
                 "index_id": INDEX_ID
