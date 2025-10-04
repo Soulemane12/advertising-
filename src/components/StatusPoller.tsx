@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Timeline from './Timeline';
 
 interface StatusPollerProps {
   videoId: string;
@@ -183,21 +184,16 @@ export default function StatusPoller({ videoId }: StatusPollerProps) {
         </div>
       )}
 
-      {/* Success Message */}
+      {/* Timeline UI when analysis is complete */}
       {status.status === 'completed' && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4">
-          <h4 className="font-semibold text-green-800 mb-2">Processing Complete!</h4>
-          <p className="text-green-700 text-sm">
-            Your video has been analyzed and is ready for template selection.
-          </p>
-          {status.timeline && (
-            <div className="mt-3 p-3 bg-white rounded border">
-              <h5 className="font-medium text-gray-800 mb-2">Analysis Summary:</h5>
-              <pre className="text-xs text-gray-600 overflow-auto">
-                {JSON.stringify(status.timeline, null, 2)}
-              </pre>
-            </div>
-          )}
+        <div>
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-6">
+            <h4 className="font-semibold text-green-800 mb-2">✅ Analysis Complete!</h4>
+            <p className="text-green-700 text-sm">
+              Your video has been analyzed. Select scenes below to create your advertisement.
+            </p>
+          </div>
+          <Timeline videoId={videoId} />
         </div>
       )}
 

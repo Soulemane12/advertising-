@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useRef, DragEvent } from 'react';
+import { useState, useRef, DragEvent, useEffect } from 'react';
 import StatusPoller from './StatusPoller';
+import VideoHistory from './VideoHistory';
+import { videoStorage, createStoredVideo } from '@/lib/videoStorage';
 
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
@@ -10,6 +12,7 @@ export default function Upload() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [currentView, setCurrentView] = useState<'upload' | 'history' | 'processing'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: DragEvent) => {
@@ -140,7 +143,20 @@ export default function Upload() {
 
       const json = await res.json();
       console.log('✅ Upload successful:', json);
-      setVideoId(json.videoId);
+      const newVideoId = json.videoId;
+      setVideoId(newVideoId);
+
+      // Save to localStorage
+      const videoName = file ? file.name : url.split('/').pop() || 'Video from URL';
+      const storedVideo = createStoredVideo(
+        newVideoId,
+        videoName,
+        file?.size
+      );
+      videoStorage.save(storedVideo);
+
+      // Switch to processing view
+      setCurrentView('processing');
     } catch (err) {
       console.error('❌ Upload error:', err);
       if (err instanceof TypeError && err.message.includes('fetch')) {
@@ -160,32 +176,81 @@ export default function Upload() {
     setVideoId(null);
     setError(null);
     setLoading(false);
+    setCurrentView('upload');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  if (videoId) {
+  const handleSelectVideo = (selectedVideoId: string) => {
+    setVideoId(selectedVideoId);
+    setCurrentView('processing');
+  };
+
+  const handleUploadNew = () => {
+    reset();
+  };
+
+  // Add useEffect to update video status in localStorage
+  useEffect(() => {
+    if (videoId) {
+      const video = videoStorage.get(videoId);
+      if (video) {
+        videoStorage.save({ ...video, status: 'processing' });
+      }
+    }
+  }, [videoId]);
+
+  // Show VideoHistory view
+  if (currentView === 'history') {
+    return (
+      <VideoHistory
+        onSelectVideo={handleSelectVideo}
+        onUploadNew={handleUploadNew}
+      />
+    );
+  }
+
+  // Show processing/results view
+  if (currentView === 'processing' && videoId) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2">Video Processing</h2>
-          <p className="text-gray-600">Video ID: {videoId}</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Video Processing</h2>
+            <p className="text-gray-600">Video ID: {videoId}</p>
+          </div>
+          <div className="space-x-2">
+            <button
+              onClick={() => setCurrentView('history')}
+              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+            >
+              View History
+            </button>
+            <button
+              onClick={reset}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              Upload New
+            </button>
+          </div>
         </div>
         <StatusPoller videoId={videoId} />
-        <button
-          onClick={reset}
-          className="mt-6 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-        >
-          Upload Another Video
-        </button>
       </div>
     );
   }
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-8 text-center">Upload Video for Analysis</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold">Upload Video for Analysis</h1>
+        <button
+          onClick={() => setCurrentView('history')}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+        >
+          📂 View History
+        </button>
+      </div>
 
       <div className="space-y-6">
         {/* Drag and Drop Zone */}
