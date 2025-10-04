@@ -241,68 +241,137 @@ export default function Timeline({ videoId }: TimelineProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">Select Video Clips</h2>
-        <p className="text-gray-600">
-          Choose scenes to include in your advertisement. Total duration: {formatTime(getTotalDuration())}
-        </p>
+    <div className="animate-fade-in-up">
+      {/* Header Section */}
+      <div className="card-elevated p-8 mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z"/>
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold text-white mb-1">Select Video Clips</h2>
+              <p className="text-gray-400">
+                Choose scenes to include in your advertisement • Total: {formatTime(getTotalDuration())}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <div className="badge badge-info">
+              {selectedIds.length} of {scenes.length} selected
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Indicator */}
+        <div className="mb-6">
+          <div className="flex justify-between text-sm text-gray-400 mb-2">
+            <span>Selection Progress</span>
+            <span>{Math.round((selectedIds.length / scenes.length) * 100)}%</span>
+          </div>
+          <div className="progress-bar">
+            <div
+              className="progress-fill"
+              style={{ width: `${(selectedIds.length / scenes.length) * 100}%` }}
+            ></div>
+          </div>
+        </div>
       </div>
 
-      {/* Scene Selection */}
-      <div className="space-y-4 mb-6">
-        {scenes.map((scene) => (
+      {/* Scene Selection Grid */}
+      <div className="space-y-4 mb-8">
+        {scenes.map((scene, index) => (
           <div
             key={scene.id}
-            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+            className={`card cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:shadow-xl ${
               selectedIds.includes(scene.id)
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300'
+                ? 'ring-2 ring-emerald-500 bg-emerald-500/10 border-emerald-500/50'
+                : 'hover:border-white/30'
             }`}
             onClick={() => toggleScene(scene.id)}
+            style={{ animationDelay: `${index * 0.1}s` }}
           >
-            <div className="flex items-start space-x-4">
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(scene.id)}
-                onChange={() => toggleScene(scene.id)}
-                className="mt-1"
-              />
+            <div className="p-6">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0 mt-1">
+                  <div className={`relative w-6 h-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedIds.includes(scene.id)
+                      ? 'bg-emerald-500 border-emerald-500'
+                      : 'border-white/30 hover:border-emerald-500/50'
+                  }`}>
+                    {selectedIds.includes(scene.id) && (
+                      <svg className="w-4 h-4 text-white absolute top-0.5 left-0.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    )}
+                  </div>
+                </div>
 
-              <div className="flex-1">
-                <div className="flex items-center space-x-4 mb-2">
-                  <span className="font-medium">
-                    {formatTime(scene.start)} - {formatTime(scene.end)}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    ({scene.end - scene.start}s)
-                  </span>
-                  {scene.sentiment === 'positive' && (
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      High Energy
-                    </span>
+                <div className="flex-1 min-w-0">
+                  {/* Scene Header */}
+                  <div className="flex items-center space-x-4 mb-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span className="font-semibold text-white text-lg">
+                        {formatTime(scene.start)} - {formatTime(scene.end)}
+                      </span>
+                    </div>
+                    <div className="badge badge-neutral">
+                      {scene.end - scene.start}s
+                    </div>
+                    {scene.sentiment === 'positive' && (
+                      <div className="badge badge-success">
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12,2L13.09,8.26L22,9L17,14L18.18,22L12,19L5.82,22L7,14L2,9L10.91,8.26L12,2Z"/>
+                        </svg>
+                        High Energy
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scene Content */}
+                  {scene.transcript && (
+                    <div className="mb-4">
+                      <p className="text-gray-300 leading-relaxed">
+                        {scene.transcript.length > 150
+                          ? `${scene.transcript.substring(0, 150)}...`
+                          : scene.transcript
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Scene Tags */}
+                  {scene.tags && scene.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {scene.tags.slice(0, 5).map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 text-xs font-medium bg-white/10 text-gray-300 rounded-full border border-white/20"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {scene.tags.length > 5 && (
+                        <span className="px-3 py-1 text-xs font-medium bg-white/5 text-gray-400 rounded-full border border-white/10">
+                          +{scene.tags.length - 5} more
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
 
-                {scene.transcript && (
-                  <p className="text-gray-700 text-sm mb-2">
-                    {scene.transcript.length > 100
-                      ? `${scene.transcript.substring(0, 100)}...`
-                      : scene.transcript
-                    }
-                  </p>
-                )}
-
-                {scene.tags && scene.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {scene.tags.slice(0, 5).map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                {/* Selection Indicator */}
+                {selectedIds.includes(scene.id) && (
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    </div>
                   </div>
                 )}
               </div>
@@ -311,36 +380,47 @@ export default function Timeline({ videoId }: TimelineProps) {
         ))}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">
-          {selectedIds.length} scene{selectedIds.length !== 1 ? 's' : ''} selected
-        </div>
+      {/* Action Bar */}
+      <div className="card-elevated p-6 sticky bottom-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="text-white font-medium">
+              {selectedIds.length} scene{selectedIds.length !== 1 ? 's' : ''} selected
+            </div>
+            {selectedIds.length > 0 && (
+              <div className="text-gray-400 text-sm">
+                Total duration: {formatTime(getTotalDuration())}
+              </div>
+            )}
+          </div>
 
-        <div className="space-x-3">
-          <button
-            onClick={() => setSelectedIds([])}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Clear All
-          </button>
-          <button
-            onClick={() => setSelectedIds(scenes.map(s => s.id))}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Select All
-          </button>
-          <button
-            onClick={generateClips}
-            disabled={selectedIds.length === 0}
-            className={`px-6 py-2 rounded font-medium ${
-              selectedIds.length === 0
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            Generate Advertisement
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="btn-ghost"
+              disabled={selectedIds.length === 0}
+            >
+              Clear All
+            </button>
+            <button
+              onClick={() => setSelectedIds(scenes.map(s => s.id))}
+              className="btn-secondary"
+            >
+              Select All
+            </button>
+            <button
+              onClick={generateClips}
+              disabled={selectedIds.length === 0}
+              className={`btn-primary ${
+                selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8,5.14V19.14L19,12.14L8,5.14Z"/>
+              </svg>
+              Generate Advertisement
+            </button>
+          </div>
         </div>
       </div>
     </div>
